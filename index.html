@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>PnL Trend Report</title>
+
+<title>Quantum Yield IDT Trading In-sample and Out-of-sample Weekly Report</title>
 
 <style>
 :root{
@@ -21,11 +22,11 @@ body{
 }
 .wrap{max-width:1480px;margin:0 auto;padding:16px}
 
-/* ===== Header (NEW) ===== */
+/* ===== Header ===== */
 .hdr{
   display:flex;
   align-items:center;
-  justify-content:space-between;
+  justify-content:flex-start;
   gap:16px;
   padding:12px 16px;
   margin-bottom:14px;
@@ -50,39 +51,8 @@ body{
   color:var(--text);
   letter-spacing:.2px;
 }
-/* connection status pill (kept for compatibility, but not shown since Offline removed) */
-.status-pill{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:6px 12px;
-  border-radius:999px;
-  font-size:13px;
-  font-weight:600;
-  border:1px solid rgba(148,163,184,.25);
-  background:#0f172a;
-  color:var(--muted);
-}
-.status-pill .dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:#64748b;
-}
-.status-pill.live{
-  color:#22c55e;
-  border-color:rgba(34,197,94,.5);
-}
-.status-pill.live .dot{
-  background:#22c55e;
-  box-shadow:0 0 6px rgba(34,197,94,.8);
-}
-.status-pill.stop{
-  color:#f87171;
-  border-color:rgba(248,113,113,.45);
-}
-.status-pill.stop .dot{ background:#f87171; }
 
+/* ===== Panels / Controls ===== */
 .panel{
   background:var(--panel);
   border:1px solid rgba(148,163,184,.18);
@@ -90,7 +60,24 @@ body{
   padding:14px;
   margin-bottom:12px;
 }
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.row{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:flex-end; /* ✅ baseline-align all controls */
+}
+
+/* make label blocks behave consistently */
+.ctrl{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.ctrl label{
+  font-size:12px;
+  color:var(--muted);
+  margin-left:2px;
+}
 select,button{
   background:#0f172a;
   color:var(--text);
@@ -125,7 +112,7 @@ svg{
   flex-wrap:wrap;
 }
 
-/* wider horizon selector + no scrolling + multi-column wrap */
+/* ✅ horizons: 3 columns */
 .hzList{
   background:#0f172a;
   border:1px solid rgba(148,163,184,.25);
@@ -135,13 +122,20 @@ svg{
   max-height:none;
   overflow:visible;
 
-  min-width:560px;
+  min-width:740px;
 
   display:grid;
-  grid-template-columns:repeat(4, minmax(180px, 1fr));
+  grid-template-columns:repeat(3, minmax(210px, 1fr));
   column-gap:18px;
   row-gap:6px;
 }
+@media (max-width: 1100px){
+  .hzList{
+    grid-template-columns:repeat(2, minmax(220px, 1fr));
+    min-width:560px;
+  }
+}
+
 .hzItem{
   display:flex;
   align-items:center;
@@ -188,12 +182,20 @@ svg{
 }
 .muted{color:var(--muted)}
 
-/* ===== Date range box (NEW) ===== */
-.dateBox{
+/* quick range buttons */
+.btnRow{
   display:flex;
-  gap:10px;
+  gap:8px;
   align-items:flex-end;
-  flex-wrap:wrap;
+}
+.btnPill{
+  padding:9px 12px;
+  border-radius:12px;
+  font-weight:600;
+}
+.btnPill.active{
+  border-color:rgba(56,189,248,.7);
+  box-shadow:0 0 0 2px rgba(56,189,248,.15) inset;
 }
 </style>
 </head>
@@ -201,49 +203,56 @@ svg{
 <body>
 <div class="wrap">
 
-  <!-- ===== Header (NEW) ===== -->
+  <!-- ===== Header ===== -->
   <div class="hdr">
     <div class="brand">
       <a href="https://quantumyield.ai" target="_blank" rel="noopener">
         <img src="https://quantumyield.ai/logo.jpg" alt="Quantum Yield Logo">
       </a>
-      <h1 id="pageTitle">Quantum Yield Intra-Day-Trading Daily In and out Sample Testing</h1>
+      <h1 id="pageTitle">Quantum Yield IDT Trading — In-sample & Out-of-sample Weekly Report</h1>
     </div>
-    <!-- Offline button removed -->
   </div>
 
+  <!-- ===== Controls ===== -->
   <div class="panel">
     <div class="row">
-      <label>Symbol <select id="sym"></select></label>
-      <label>IS/OS <select id="tag"><option>IS</option><option>OS</option></select></label>
 
-      <!-- ===== Date Range (NEW) ===== -->
-      <div class="dateBox">
-        <div>
-          <div class="muted" style="font-size:12px;margin:0 0 6px 2px;">Date start</div>
-          <select id="dateStart"></select>
-        </div>
-        <div>
-          <div class="muted" style="font-size:12px;margin:0 0 6px 2px;">Date end</div>
-          <select id="dateEnd"></select>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center; margin-top:18px;">
-          <button id="dateAll" type="button">All</button>
-          <button id="date5" type="button">Last 5</button>
-          <button id="date10" type="button">Last 10</button>
-        </div>
+      <div class="ctrl">
+        <label>Symbol</label>
+        <select id="sym"></select>
       </div>
 
-      <div class="hzBox">
+      <div class="ctrl">
+        <label>IS/OS</label>
+        <select id="tag"><option>IS</option><option>OS</option></select>
+      </div>
+
+      <div class="ctrl">
+        <label>Date start</label>
+        <select id="dateStart"></select>
+      </div>
+
+      <div class="ctrl">
+        <label>Date end</label>
+        <select id="dateEnd"></select>
+      </div>
+
+      <div class="btnRow">
+        <button id="btnAll" class="btnPill">All</button>
+        <button id="btnLast5" class="btnPill">Last 5</button>
+        <button id="btnLast10" class="btnPill">Last 10</button>
+      </div>
+
+      <div class="hzBox" style="width:100%;">
         <div>
           <div class="muted" style="font-size:12px;margin:0 0 6px 2px;">Horizons (multi)</div>
           <div id="hzList" class="hzList"></div>
         </div>
 
-        <div>
+        <div style="min-width:320px;">
           <label class="muted" style="font-size:12px;display:block;margin:0 0 6px 2px;">Metric</label>
           <div class="row" style="gap:8px;">
-            <select id="metric"></select>
+            <select id="metric" style="min-width:180px;"></select>
             <button id="prev">◀</button>
             <button id="next">▶</button>
           </div>
@@ -270,8 +279,12 @@ svg{
     </div>
 
     <div class="panel">
-      <div style="color:var(--muted);font-weight:600;margin-bottom:6px">
-        Latest day snapshot (uses first selected horizon)
+      <div style="color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <span>Snapshot metrics (first selected horizon)</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span class="muted" style="font-size:12px;">Snapshot date</span>
+          <select id="snapDate" style="padding:8px 10px;font-size:13px;"></select>
+        </span>
       </div>
       <div class="kv" id="kpi"></div>
     </div>
@@ -292,26 +305,10 @@ const COLORS = [
 
 // authoritative metric order (same as CSV)
 const CSV_METRIC_ORDER = [
-  "count",
-  "mean_all_bps",
-  "std_all_bps",
-  "median_bps",
-  "p5_bps",
-  "p95_bps",
-  "min_bps",
-  "max_bps",
-  "num_trades",
-  "num_longs",
-  "num_shorts",
-  "mean_trades_bps",
-  "mean_long_bps",
-  "mean_short_bps",
-  "win_rate",
-  "long_win_rate",
-  "short_win_rate",
-  "sharpe",
-  "sortino",
-  "kelly"
+  "count","mean_all_bps","std_all_bps","median_bps","p5_bps","p95_bps",
+  "min_bps","max_bps","num_trades","num_longs","num_shorts",
+  "mean_trades_bps","mean_long_bps","mean_short_bps",
+  "win_rate","long_win_rate","short_win_rate","sharpe","sortino","kelly"
 ];
 
 function uniq(a){ return [...new Set(a)]; }
@@ -326,17 +323,6 @@ function fmt(x){
 }
 function status(s){ $("status").textContent=s; }
 
-function selection(){
-  const sym = $("sym").value;
-  const tag = $("tag").value;
-  const metric = $("metric").value;
-
-  const hz = [...document.querySelectorAll('input[name="hzcb"]:checked')].map(el => Number(el.value));
-  hz.sort((a,b)=>a-b);
-
-  return { sym, tag, metric, horizons: hz };
-}
-
 function horizonLabel(ms){
   const s = ms/1000;
   if(s < 60) return `${Math.round(s)}s`;
@@ -345,122 +331,36 @@ function horizonLabel(ms){
   return `${Math.round(m/60)}h`;
 }
 
-/* ===== Date Range helpers (NEW) ===== */
-let DATE_RANGE = { start: null, end: null };
+function selection(){
+  const sym = $("sym").value;
+  const tag = $("tag").value;
+  const metric = $("metric").value;
 
-function getSelectedDateRange(){
-  const ds = $("dateStart");
-  const de = $("dateEnd");
-  const s = ds ? ds.value : null;
-  const e = de ? de.value : null;
-  if(!s || !e) return { start: s, end: e };
-  return (s <= e) ? { start: s, end: e } : { start: e, end: s };
+  const hz = [...document.querySelectorAll('input[name="hzcb"]:checked')].map(el => Number(el.value));
+  hz.sort((a,b)=>a-b);
+
+  const ds = $("dateStart").value;
+  const de = $("dateEnd").value;
+
+  return { sym, tag, metric, horizons: hz, dateStart: ds, dateEnd: de };
 }
-function inRange(d, start, end){
-  if(start && d < start) return false;
-  if(end && d > end) return false;
-  return true;
+
+/* ---------- dates helpers (per sym/tag) ---------- */
+function allDatesFor(sym, tag){
+  return uniq(DATA.filter(d => d.symbol===sym && d.tag===tag).map(d => d.asof)).sort();
 }
-function fmtYYYYMMDD(s){
-  if(!s || String(s).length !== 8) return String(s || "");
-  return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
-}
-function updateTitleForRange(start, end){
-  const base = "Quantum Yield Intra-Day-Trading In-sample and Out-of-sample Daily Report";
-  if(!start || !end){
-    document.title = base;
-    const h = $("pageTitle");
-    if(h) h.textContent = base;
-    return;
+function clampEndGteStart(){
+  const ds = $("dateStart").value;
+  const de = $("dateEnd").value;
+  if(de < ds){
+    $("dateEnd").value = ds; // ✅ enforce end >= start
   }
-  const full = `${base} (${fmtYYYYMMDD(start)} → ${fmtYYYYMMDD(end)})`;
-  document.title = full;
-  const h = $("pageTitle");
-  if(h) h.textContent = full;
 }
-
-/* ===== Enforce end >= start (NEW) ===== */
-function enforceDateConstraint(){
-  const ds = $("dateStart");
-  const de = $("dateEnd");
-  if(!ds || !de) return;
-
-  // snap end forward if needed
-  if(de.value < ds.value){
-    de.value = ds.value;
-  }
-
-  // disable invalid end options
-  [...de.options].forEach(opt => {
-    opt.disabled = (opt.value < ds.value);
-  });
-}
-
-function refreshDateRangeSelectors(rows){
-  const dates = uniq(rows.map(r => String(r.asof))).sort();
-  const ds = $("dateStart"), de = $("dateEnd");
-  if(!ds || !de) return;
-
-  ds.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join("");
-  de.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join("");
-
-  // keep prior selection if possible
-  const prev = DATE_RANGE;
-  const start = (prev.start && dates.includes(prev.start)) ? prev.start : (dates[0] || "");
-  const end   = (prev.end   && dates.includes(prev.end))   ? prev.end   : (dates[dates.length-1] || "");
-
-  ds.value = start;
-  de.value = end;
-
-  // enforce end >= start
-  enforceDateConstraint();
-
-  DATE_RANGE = getSelectedDateRange();
-  updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
-
-  ds.onchange = () => {
-    enforceDateConstraint();
-    DATE_RANGE = getSelectedDateRange();
-    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
-    render();
-  };
-  de.onchange = () => {
-    enforceDateConstraint();
-    DATE_RANGE = getSelectedDateRange();
-    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
-    render();
-  };
-
-  const btnAll = $("dateAll"), btn5 = $("date5"), btn10 = $("date10");
-  if(btnAll) btnAll.onclick = () => {
-    if(!dates.length) return;
-    ds.value = dates[0];
-    de.value = dates[dates.length-1];
-    enforceDateConstraint();
-    DATE_RANGE = getSelectedDateRange();
-    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
-    render();
-  };
-  if(btn5) btn5.onclick = () => {
-    if(!dates.length) return;
-    const n = Math.min(5, dates.length);
-    ds.value = dates[dates.length-n];
-    de.value = dates[dates.length-1];
-    enforceDateConstraint();
-    DATE_RANGE = getSelectedDateRange();
-    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
-    render();
-  };
-  if(btn10) btn10.onclick = () => {
-    if(!dates.length) return;
-    const n = Math.min(10, dates.length);
-    ds.value = dates[dates.length-n];
-    de.value = dates[dates.length-1];
-    enforceDateConstraint();
-    DATE_RANGE = getSelectedDateRange();
-    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
-    render();
-  };
+function filteredDates(sym, tag){
+  const ds = $("dateStart").value;
+  const de = $("dateEnd").value;
+  const all = allDatesFor(sym, tag);
+  return all.filter(d => d >= ds && d <= de);
 }
 
 /* ---------- selectors ---------- */
@@ -468,16 +368,37 @@ function buildSelectors(){
   const syms = uniq(DATA.map(d=>d.symbol)).sort();
   $("sym").innerHTML = syms.map(s=>`<option>${s}</option>`).join("");
   $("sym").value = syms.includes("ES") ? "ES" : syms[0];
+
+  refreshAllForSymTag(true);
+}
+
+function refreshAllForSymTag(resetQuickButtons){
+  const sym = $("sym").value;
+  const tag = $("tag").value;
+
+  // dates
+  const dates = allDatesFor(sym, tag);
+  $("dateStart").innerHTML = dates.map(d=>`<option value="${d}">${d}</option>`).join("");
+  $("dateEnd").innerHTML   = dates.map(d=>`<option value="${d}">${d}</option>`).join("");
+
+  // default: full range
+  if(dates.length){
+    $("dateStart").value = dates[0];
+    $("dateEnd").value = dates[dates.length-1];
+  }
+
+  if(resetQuickButtons){
+    setQuickActive("all");
+  }
+
   refreshHZMetric();
 }
 
+/* ---------- horizons + metrics ---------- */
 function refreshHZMetric(){
   const sym = $("sym").value;
   const tag = $("tag").value;
   const rows = DATA.filter(d=>d.symbol===sym && d.tag===tag);
-
-  // (NEW) refresh date range options for current selection
-  refreshDateRangeSelectors(rows);
 
   // horizons
   const hzs = uniq(rows.map(d=>d.horizon_ms)).sort((a,b)=>a-b);
@@ -516,6 +437,30 @@ function refreshHZMetric(){
   $("metric").innerHTML = METRICS.map(m=>`<option>${m}</option>`).join("");
   $("metric").value = METRICS[0] || "";
 
+  // snapDate list depends on date range; initialize in render()
+  render();
+}
+
+/* ---------- quick buttons ---------- */
+function setQuickActive(which){
+  ["btnAll","btnLast5","btnLast10"].forEach(id=>$(id).classList.remove("active"));
+  if(which==="all") $("btnAll").classList.add("active");
+  if(which==="last5") $("btnLast5").classList.add("active");
+  if(which==="last10") $("btnLast10").classList.add("active");
+}
+
+function applyRangeLastN(n){
+  const sym = $("sym").value;
+  const tag = $("tag").value;
+  const dates = allDatesFor(sym, tag);
+  if(!dates.length) return;
+
+  const start = dates[Math.max(0, dates.length - n)];
+  const end = dates[dates.length - 1];
+
+  $("dateStart").value = start;
+  $("dateEnd").value = end;
+  clampEndGteStart();
   render();
 }
 
@@ -568,6 +513,19 @@ function niceTicks(min, max, n=6){
   return { min: niceMin, max: niceMax, ticks };
 }
 
+/* ---------- snapshot date list ---------- */
+function refreshSnapDateList(datesInRange){
+  const prev = $("snapDate").value;
+  $("snapDate").innerHTML = datesInRange.map(d=>`<option value="${d}">${d}</option>`).join("");
+
+  // keep previous if still valid, else default to latest
+  if(prev && datesInRange.includes(prev)){
+    $("snapDate").value = prev;
+  } else if(datesInRange.length){
+    $("snapDate").value = datesInRange[datesInRange.length-1];
+  }
+}
+
 /* ---------- render ---------- */
 function render(){
   const {sym, tag, metric, horizons} = selection();
@@ -590,34 +548,38 @@ function render(){
     return;
   }
 
+  // ✅ enforce end >= start
+  clampEndGteStart();
+
   renderLegend(horizons);
 
-  // X-axis dates for symbol/tag, filtered by selected date range (NEW)
-  const rng = getSelectedDateRange();
-  const dates = uniq(
-    DATA.filter(d => d.symbol===sym && d.tag===tag).map(d => String(d.asof))
-  ).sort().filter(d => inRange(d, rng.start, rng.end));
+  // dates filtered by range
+  const dates = filteredDates(sym, tag);
 
   if(!dates.length){
-    status("No dates found for selection (check date range).");
+    status("No dates in selected range.");
     svg.innerHTML = "";
     $("kpi").innerHTML = "";
+    $("snapDate").innerHTML = "";
     return;
   }
 
+  // update snapshot date dropdown based on range
+  refreshSnapDateList(dates);
+
   const dateIndex = new Map(dates.map((d,i)=>[d,i]));
 
-  // Per-horizon finite points within range
+  // Per-horizon finite points (only within range)
   const seriesMap = new Map();
   horizons.forEach(hz => {
     const rows = DATA
-      .filter(d => d.symbol===sym && d.tag===tag && d.horizon_ms===hz)
-      .sort((a,b)=>String(a.asof).localeCompare(String(b.asof)));
+      .filter(d => d.symbol===sym && d.tag===tag && d.horizon_ms===hz && d.asof >= dates[0] && d.asof <= dates[dates.length-1])
+      .sort((a,b)=>a.asof.localeCompare(b.asof));
     const pts = rows.map(r => ({
-      asof: String(r.asof),
+      asof: r.asof,
       y: Number(r[metric]),
       raw: r
-    })).filter(p => Number.isFinite(p.y) && inRange(p.asof, rng.start, rng.end));
+    })).filter(p => Number.isFinite(p.y));
     seriesMap.set(hz, pts);
   });
 
@@ -638,10 +600,7 @@ function render(){
   const yTicks = ticksObj.ticks;
 
   const W=1200, H=470;
-
-  // bottom margin ensures x labels stay inside the frame
   const m={l:90,r:20,t:22,b:110};
-
   const pw=W-m.l-m.r, ph=H-m.t-m.b;
 
   const X = (date) => {
@@ -659,7 +618,7 @@ function render(){
     `;
   }).join("");
 
-  // x labels anchored to axis baseline (inside margin), edge-anchored + clamped
+  // x labels: edge-anchored + clamped inside frame
   const xLabelY = (H - m.b) + 28;
   const xPad = 6;
   const xMin = m.l + xPad;
@@ -667,7 +626,6 @@ function render(){
 
   const xLabels = dates.map((d, i) => {
     let x = X(d);
-
     if (x < xMin) x = xMin;
     if (x > xMax) x = xMax;
 
@@ -681,7 +639,7 @@ function render(){
              fill="rgba(148,163,184,.95)">${d}</text>`;
   }).join("");
 
-  // colors stable by horizon order
+  // colors stable by horizon order (global for sym/tag)
   const rowsForColorIndex = DATA.filter(d=>d.symbol===sym && d.tag===tag);
   const allHzSorted = uniq(rowsForColorIndex.map(d=>d.horizon_ms)).sort((a,b)=>a-b);
 
@@ -720,7 +678,6 @@ function render(){
     });
   });
 
-  // axes (x-axis baseline at H - m.b)
   svg.innerHTML = `
     <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"></rect>
     ${gridLines}
@@ -735,23 +692,29 @@ function render(){
     ${points}
   `;
 
-  status(`${sym} ${tag} • metric=${metric} • horizons=${horizons.length} • dates=${dates.length} • range=${rng.start||"—"}..${rng.end||"—"}`);
+  status(`${sym} ${tag} • metric=${metric} • horizons=${horizons.length} • dates=${dates.length} • range=${dates[0]}–${dates[dates.length-1]}`);
 
-  // snapshot keys in exact CSV order (asof + METRICS)
+  /* ===== KPI snapshot for selected snapDate + first selected horizon ===== */
   const firstHz = horizons[0];
-  const snapRows = DATA
-    .filter(d => d.symbol===sym && d.tag===tag && d.horizon_ms===firstHz && inRange(String(d.asof), rng.start, rng.end))
-    .sort((a,b)=>String(a.asof).localeCompare(String(b.asof)));
-  const last = snapRows[snapRows.length-1] || null;
+  const snapDate = $("snapDate").value;
 
-  if(last){
+  // metrics list based on sym/tag availability (unchanged)
+  const rowsAll = DATA.filter(d=>d.symbol===sym && d.tag===tag);
+  const rowsThisHz = rowsAll.filter(d=>d.horizon_ms===firstHz);
+
+  // ensure METRICS uses CSV order and only existing numeric
+  METRICS = CSV_METRIC_ORDER.filter(k => rowsAll.some(r => Number.isFinite(Number(r[k]))));
+
+  const row = rowsThisHz.find(d => d.asof === snapDate) || null;
+
+  if(row){
     const SNAPSHOT_KEYS = ["asof"].concat(METRICS);
     $("kpi").innerHTML = SNAPSHOT_KEYS
-      .filter(k=>k in last)
-      .map(k=>`<div>${k}</div><div>${fmt(last[k])}</div>`)
+      .filter(k=>k in row)
+      .map(k=>`<div>${k}</div><div>${fmt(row[k])}</div>`)
       .join("");
   } else {
-    $("kpi").innerHTML = `<div class="muted">No snapshot rows for first selected horizon in range.</div>`;
+    $("kpi").innerHTML = `<div class="muted">No snapshot row for ${snapDate} (first horizon ${firstHz}).</div>`;
   }
 
   // tooltip hover
@@ -804,11 +767,29 @@ async function main(){
 
   buildSelectors();
 
-  $("sym").onchange = refreshHZMetric;
-  $("tag").onchange = refreshHZMetric;
+  $("sym").onchange = () => refreshAllForSymTag(true);
+  $("tag").onchange = () => refreshAllForSymTag(true);
+
+  $("dateStart").onchange = () => { clampEndGteStart(); setQuickActive(""); render(); };
+  $("dateEnd").onchange   = () => { clampEndGteStart(); setQuickActive(""); render(); };
+
   $("metric").onchange = render;
   $("prev").onclick = () => cycleMetric(-1);
   $("next").onclick = () => cycleMetric(1);
+
+  $("snapDate").onchange = render;
+
+  $("btnAll").onclick = () => {
+    const sym = $("sym").value, tag = $("tag").value;
+    const dates = allDatesFor(sym, tag);
+    if(!dates.length) return;
+    $("dateStart").value = dates[0];
+    $("dateEnd").value = dates[dates.length-1];
+    setQuickActive("all");
+    render();
+  };
+  $("btnLast5").onclick = () => { setQuickActive("last5"); applyRangeLastN(5); };
+  $("btnLast10").onclick = () => { setQuickActive("last10"); applyRangeLastN(10); };
 }
 main();
 </script>
