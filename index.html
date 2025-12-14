@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PnL Trend Report</title>
+
+<style>
+:root{
+  --bg:#0b0f14;
+  --panel:#111826;
+  --muted:#94a3b8;
+  --text:#e5e7eb;
+  --accent:#38bdf8;
+}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  background:var(--bg);
+  color:var(--text);
+}
+.wrap{max-width:1480px;margin:0 auto;padding:16px}
+
+/* ===== Header (NEW) ===== */
+.hdr{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 16px;
+  margin-bottom:14px;
+  background:linear-gradient(180deg,#0f172a,#0b0f14);
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:16px;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.brand img{
+  height:40px;
+  width:auto;
+  border-radius:8px;
+}
+.brand h1{
+  margin:0;
+  font-size:18px;
+  font-weight:600;
+  color:var(--text);
+  letter-spacing:.2px;
+}
+/* connection status pill (kept for compatibility, but not shown since Offline removed) */
+.status-pill{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 12px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:600;
+  border:1px solid rgba(148,163,184,.25);
+  background:#0f172a;
+  color:var(--muted);
+}
+.status-pill .dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#64748b;
+}
+.status-pill.live{
+  color:#22c55e;
+  border-color:rgba(34,197,94,.5);
+}
+.status-pill.live .dot{
+  background:#22c55e;
+  box-shadow:0 0 6px rgba(34,197,94,.8);
+}
+.status-pill.stop{
+  color:#f87171;
+  border-color:rgba(248,113,113,.45);
+}
+.status-pill.stop .dot{ background:#f87171; }
+
+.panel{
+  background:var(--panel);
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:12px;
+}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+select,button{
+  background:#0f172a;
+  color:var(--text);
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:14px;
+}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+
+/* 2:1 ratio (chart wider) */
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+@media(max-width:980px){.grid{grid-template-columns:1fr}}
+
+.chartWrap{position:relative}
+svg{
+  width:100%;
+  height:470px;
+  background:#0f172a;
+  border-radius:12px;
+  border:1px solid rgba(148,163,184,.15);
+}
+.kv{display:grid;grid-template-columns:190px 1fr;gap:8px;font-size:14px}
+.kv div:nth-child(odd){color:var(--muted)}
+
+.hzBox{
+  display:flex;
+  gap:14px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+
+/* wider horizon selector + no scrolling + multi-column wrap */
+.hzList{
+  background:#0f172a;
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:12px;
+  padding:10px;
+
+  max-height:none;
+  overflow:visible;
+
+  min-width:560px;
+
+  display:grid;
+  grid-template-columns:repeat(4, minmax(180px, 1fr));
+  column-gap:18px;
+  row-gap:6px;
+}
+.hzItem{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:2px 0;
+  font-size:13px;
+  color:var(--text);
+  white-space:nowrap;
+}
+
+.swatch{
+  width:10px;height:10px;border-radius:3px;display:inline-block;
+  border:1px solid rgba(148,163,184,.35);
+}
+.legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:8px;
+  color:var(--muted);
+  font-size:12px;
+}
+.legendItem{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 8px;
+  border-radius:999px;
+  background:rgba(148,163,184,.08);
+  border:1px solid rgba(148,163,184,.12);
+}
+.tooltip{
+  position:absolute;
+  pointer-events:none;
+  display:none;
+  z-index:10;
+  background:#0b1220;
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:12px;
+  color:var(--text);
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+  max-width:340px;
+  white-space:nowrap;
+}
+.muted{color:var(--muted)}
+
+/* ===== Date range box (NEW) ===== */
+.dateBox{
+  display:flex;
+  gap:10px;
+  align-items:flex-end;
+  flex-wrap:wrap;
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <!-- ===== Header (NEW) ===== -->
+  <div class="hdr">
+    <div class="brand">
+      <a href="https://quantumyield.ai" target="_blank" rel="noopener">
+        <img src="https://quantumyield.ai/logo.jpg" alt="Quantum Yield Logo">
+      </a>
+      <h1 id="pageTitle">Quantum Yield Intra-Day-Trading Daily In and out Sample Testing</h1>
+    </div>
+    <!-- Offline button removed -->
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <label>Symbol <select id="sym"></select></label>
+      <label>IS/OS <select id="tag"><option>IS</option><option>OS</option></select></label>
+
+      <!-- ===== Date Range (NEW) ===== -->
+      <div class="dateBox">
+        <div>
+          <div class="muted" style="font-size:12px;margin:0 0 6px 2px;">Date start</div>
+          <select id="dateStart"></select>
+        </div>
+        <div>
+          <div class="muted" style="font-size:12px;margin:0 0 6px 2px;">Date end</div>
+          <select id="dateEnd"></select>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:18px;">
+          <button id="dateAll" type="button">All</button>
+          <button id="date5" type="button">Last 5</button>
+          <button id="date10" type="button">Last 10</button>
+        </div>
+      </div>
+
+      <div class="hzBox">
+        <div>
+          <div class="muted" style="font-size:12px;margin:0 0 6px 2px;">Horizons (multi)</div>
+          <div id="hzList" class="hzList"></div>
+        </div>
+
+        <div>
+          <label class="muted" style="font-size:12px;display:block;margin:0 0 6px 2px;">Metric</label>
+          <div class="row" style="gap:8px;">
+            <select id="metric"></select>
+            <button id="prev">◀</button>
+            <button id="next">▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint" id="status"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div style="color:var(--muted);font-weight:600;margin-bottom:6px">
+        Trend (by day)
+      </div>
+      <div class="chartWrap">
+        <svg id="chart" viewBox="0 0 1200 470" preserveAspectRatio="none"></svg>
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+      <div class="hint">
+        X = date (asof), Y = selected metric. Missing values create gaps (date still shown).
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="color:var(--muted);font-weight:600;margin-bottom:6px">
+        Latest day snapshot (uses first selected horizon)
+      </div>
+      <div class="kv" id="kpi"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let DATA = [];
+let METRICS = [];
+const $ = id => document.getElementById(id);
+
+const COLORS = [
+  "#38bdf8", "#a78bfa", "#34d399", "#fb7185", "#fbbf24",
+  "#22c55e", "#60a5fa", "#f472b6", "#c084fc", "#f97316",
+  "#2dd4bf", "#e879f9"
+];
+
+// authoritative metric order (same as CSV)
+const CSV_METRIC_ORDER = [
+  "count",
+  "mean_all_bps",
+  "std_all_bps",
+  "median_bps",
+  "p5_bps",
+  "p95_bps",
+  "min_bps",
+  "max_bps",
+  "num_trades",
+  "num_longs",
+  "num_shorts",
+  "mean_trades_bps",
+  "mean_long_bps",
+  "mean_short_bps",
+  "win_rate",
+  "long_win_rate",
+  "short_win_rate",
+  "sharpe",
+  "sortino",
+  "kelly"
+];
+
+function uniq(a){ return [...new Set(a)]; }
+function fmt(x){
+  if(x===null||x===undefined||x==="") return "—";
+  if(typeof x==="number"){
+    if(!Number.isFinite(x)) return "—";
+    return Math.abs(x)>=1000 ? x.toFixed(0)
+      : x.toFixed(6).replace(/0+$/,"").replace(/\.$/,"");
+  }
+  return String(x);
+}
+function status(s){ $("status").textContent=s; }
+
+function selection(){
+  const sym = $("sym").value;
+  const tag = $("tag").value;
+  const metric = $("metric").value;
+
+  const hz = [...document.querySelectorAll('input[name="hzcb"]:checked')].map(el => Number(el.value));
+  hz.sort((a,b)=>a-b);
+
+  return { sym, tag, metric, horizons: hz };
+}
+
+function horizonLabel(ms){
+  const s = ms/1000;
+  if(s < 60) return `${Math.round(s)}s`;
+  const m = s/60;
+  if(m < 60) return `${Math.round(m)}m`;
+  return `${Math.round(m/60)}h`;
+}
+
+/* ===== Date Range helpers (NEW) ===== */
+let DATE_RANGE = { start: null, end: null };
+
+function getSelectedDateRange(){
+  const ds = $("dateStart");
+  const de = $("dateEnd");
+  const s = ds ? ds.value : null;
+  const e = de ? de.value : null;
+  if(!s || !e) return { start: s, end: e };
+  return (s <= e) ? { start: s, end: e } : { start: e, end: s };
+}
+function inRange(d, start, end){
+  if(start && d < start) return false;
+  if(end && d > end) return false;
+  return true;
+}
+function fmtYYYYMMDD(s){
+  if(!s || String(s).length !== 8) return String(s || "");
+  return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+}
+function updateTitleForRange(start, end){
+  const base = "Quantum Yield Intra-Day-Trading In-sample and Out-of-sample Daily Report";
+  if(!start || !end){
+    document.title = base;
+    const h = $("pageTitle");
+    if(h) h.textContent = base;
+    return;
+  }
+  const full = `${base} (${fmtYYYYMMDD(start)} → ${fmtYYYYMMDD(end)})`;
+  document.title = full;
+  const h = $("pageTitle");
+  if(h) h.textContent = full;
+}
+
+/* ===== Enforce end >= start (NEW) ===== */
+function enforceDateConstraint(){
+  const ds = $("dateStart");
+  const de = $("dateEnd");
+  if(!ds || !de) return;
+
+  // snap end forward if needed
+  if(de.value < ds.value){
+    de.value = ds.value;
+  }
+
+  // disable invalid end options
+  [...de.options].forEach(opt => {
+    opt.disabled = (opt.value < ds.value);
+  });
+}
+
+function refreshDateRangeSelectors(rows){
+  const dates = uniq(rows.map(r => String(r.asof))).sort();
+  const ds = $("dateStart"), de = $("dateEnd");
+  if(!ds || !de) return;
+
+  ds.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join("");
+  de.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join("");
+
+  // keep prior selection if possible
+  const prev = DATE_RANGE;
+  const start = (prev.start && dates.includes(prev.start)) ? prev.start : (dates[0] || "");
+  const end   = (prev.end   && dates.includes(prev.end))   ? prev.end   : (dates[dates.length-1] || "");
+
+  ds.value = start;
+  de.value = end;
+
+  // enforce end >= start
+  enforceDateConstraint();
+
+  DATE_RANGE = getSelectedDateRange();
+  updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
+
+  ds.onchange = () => {
+    enforceDateConstraint();
+    DATE_RANGE = getSelectedDateRange();
+    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
+    render();
+  };
+  de.onchange = () => {
+    enforceDateConstraint();
+    DATE_RANGE = getSelectedDateRange();
+    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
+    render();
+  };
+
+  const btnAll = $("dateAll"), btn5 = $("date5"), btn10 = $("date10");
+  if(btnAll) btnAll.onclick = () => {
+    if(!dates.length) return;
+    ds.value = dates[0];
+    de.value = dates[dates.length-1];
+    enforceDateConstraint();
+    DATE_RANGE = getSelectedDateRange();
+    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
+    render();
+  };
+  if(btn5) btn5.onclick = () => {
+    if(!dates.length) return;
+    const n = Math.min(5, dates.length);
+    ds.value = dates[dates.length-n];
+    de.value = dates[dates.length-1];
+    enforceDateConstraint();
+    DATE_RANGE = getSelectedDateRange();
+    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
+    render();
+  };
+  if(btn10) btn10.onclick = () => {
+    if(!dates.length) return;
+    const n = Math.min(10, dates.length);
+    ds.value = dates[dates.length-n];
+    de.value = dates[dates.length-1];
+    enforceDateConstraint();
+    DATE_RANGE = getSelectedDateRange();
+    updateTitleForRange(DATE_RANGE.start, DATE_RANGE.end);
+    render();
+  };
+}
+
+/* ---------- selectors ---------- */
+function buildSelectors(){
+  const syms = uniq(DATA.map(d=>d.symbol)).sort();
+  $("sym").innerHTML = syms.map(s=>`<option>${s}</option>`).join("");
+  $("sym").value = syms.includes("ES") ? "ES" : syms[0];
+  refreshHZMetric();
+}
+
+function refreshHZMetric(){
+  const sym = $("sym").value;
+  const tag = $("tag").value;
+  const rows = DATA.filter(d=>d.symbol===sym && d.tag===tag);
+
+  // (NEW) refresh date range options for current selection
+  refreshDateRangeSelectors(rows);
+
+  // horizons
+  const hzs = uniq(rows.map(d=>d.horizon_ms)).sort((a,b)=>a-b);
+  const hzList = $("hzList");
+  hzList.innerHTML = "";
+
+  const defaultPick = new Set(hzs.slice(Math.max(0, hzs.length-2))); // last 2 by default
+
+  hzs.forEach((h, idx) => {
+    const line = document.createElement("label");
+    line.className = "hzItem";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.name = "hzcb";
+    cb.value = String(h);
+    cb.checked = defaultPick.has(h);
+    cb.addEventListener("change", () => render());
+
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = COLORS[idx % COLORS.length];
+
+    const txt = document.createElement("span");
+    txt.textContent = `${h} (${horizonLabel(h)})`;
+
+    line.appendChild(cb);
+    line.appendChild(sw);
+    line.appendChild(txt);
+    hzList.appendChild(line);
+  });
+
+  // metrics in exact CSV order, include only if at least one finite number exists
+  METRICS = CSV_METRIC_ORDER.filter(k => rows.some(r => Number.isFinite(Number(r[k]))));
+
+  $("metric").innerHTML = METRICS.map(m=>`<option>${m}</option>`).join("");
+  $("metric").value = METRICS[0] || "";
+
+  render();
+}
+
+/* ---------- legend ---------- */
+function renderLegend(horizons){
+  const sym = $("sym").value;
+  const tag = $("tag").value;
+
+  const rows = DATA.filter(d=>d.symbol===sym && d.tag===tag);
+  const allHz = uniq(rows.map(d=>d.horizon_ms)).sort((a,b)=>a-b);
+
+  const legend = $("legend");
+  legend.innerHTML = "";
+  horizons.forEach(h => {
+    const idx = allHz.indexOf(h);
+    const c = COLORS[(idx >= 0 ? idx : 0) % COLORS.length];
+
+    const item = document.createElement("div");
+    item.className = "legendItem";
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = c;
+    const tx = document.createElement("span");
+    tx.textContent = `${h} (${horizonLabel(h)})`;
+    item.appendChild(sw);
+    item.appendChild(tx);
+    legend.appendChild(item);
+  });
+}
+
+/* ---------- ticks ---------- */
+function niceTicks(min, max, n=6){
+  const span = max - min;
+  if(!Number.isFinite(span) || span === 0){
+    const v = Number.isFinite(min) ? min : 0;
+    return { min: v-1, max: v+1, ticks: [v-1, v, v+1] };
+  }
+  const rawStep = span / (n-1);
+  const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const err = rawStep / pow;
+  let step = pow;
+  if(err >= 5) step = 5*pow;
+  else if(err >= 2) step = 2*pow;
+
+  const niceMin = Math.floor(min/step)*step;
+  const niceMax = Math.ceil(max/step)*step;
+
+  const ticks = [];
+  for(let v=niceMin; v<=niceMax + step/2; v+=step) ticks.push(v);
+  return { min: niceMin, max: niceMax, ticks };
+}
+
+/* ---------- render ---------- */
+function render(){
+  const {sym, tag, metric, horizons} = selection();
+  const svg = $("chart");
+  const tip = $("tooltip");
+
+  if(!metric){
+    status("No metrics found.");
+    $("legend").innerHTML = "";
+    svg.innerHTML = "";
+    $("kpi").innerHTML = "";
+    return;
+  }
+
+  if(!horizons.length){
+    status("Select at least one horizon checkbox.");
+    $("legend").innerHTML = "";
+    svg.innerHTML = "";
+    $("kpi").innerHTML = "";
+    return;
+  }
+
+  renderLegend(horizons);
+
+  // X-axis dates for symbol/tag, filtered by selected date range (NEW)
+  const rng = getSelectedDateRange();
+  const dates = uniq(
+    DATA.filter(d => d.symbol===sym && d.tag===tag).map(d => String(d.asof))
+  ).sort().filter(d => inRange(d, rng.start, rng.end));
+
+  if(!dates.length){
+    status("No dates found for selection (check date range).");
+    svg.innerHTML = "";
+    $("kpi").innerHTML = "";
+    return;
+  }
+
+  const dateIndex = new Map(dates.map((d,i)=>[d,i]));
+
+  // Per-horizon finite points within range
+  const seriesMap = new Map();
+  horizons.forEach(hz => {
+    const rows = DATA
+      .filter(d => d.symbol===sym && d.tag===tag && d.horizon_ms===hz)
+      .sort((a,b)=>String(a.asof).localeCompare(String(b.asof)));
+    const pts = rows.map(r => ({
+      asof: String(r.asof),
+      y: Number(r[metric]),
+      raw: r
+    })).filter(p => Number.isFinite(p.y) && inRange(p.asof, rng.start, rng.end));
+    seriesMap.set(hz, pts);
+  });
+
+  // Global Y range (across all selected horizons)
+  const yVals = [];
+  seriesMap.forEach(pts => pts.forEach(p => yVals.push(p.y)));
+
+  if(!yVals.length){
+    status(`No finite values to plot for ${sym} ${tag} metric=${metric} in range.`);
+    svg.innerHTML = "";
+    $("kpi").innerHTML = "";
+    return;
+  }
+
+  let yMin = Math.min(...yVals), yMax = Math.max(...yVals);
+  const ticksObj = niceTicks(yMin, yMax, 6);
+  yMin = ticksObj.min; yMax = ticksObj.max;
+  const yTicks = ticksObj.ticks;
+
+  const W=1200, H=470;
+
+  // bottom margin ensures x labels stay inside the frame
+  const m={l:90,r:20,t:22,b:110};
+
+  const pw=W-m.l-m.r, ph=H-m.t-m.b;
+
+  const X = (date) => {
+    const i = dateIndex.get(date);
+    return m.l + pw * ((i ?? 0) / (dates.length-1 || 1));
+  };
+  const Y = (v) => m.t + ph * (1 - ((v - yMin)/(yMax - yMin || 1)));
+
+  // grid + y labels
+  const gridLines = yTicks.map(v => {
+    const y = Y(v);
+    return `
+      <line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="rgba(148,163,184,.10)" />
+      <text x="${m.l-10}" y="${y+4}" text-anchor="end" font-size="11" fill="rgba(148,163,184,.85)">${fmt(v)}</text>
+    `;
+  }).join("");
+
+  // x labels anchored to axis baseline (inside margin), edge-anchored + clamped
+  const xLabelY = (H - m.b) + 28;
+  const xPad = 6;
+  const xMin = m.l + xPad;
+  const xMax = (W - m.r) - xPad;
+
+  const xLabels = dates.map((d, i) => {
+    let x = X(d);
+
+    if (x < xMin) x = xMin;
+    if (x > xMax) x = xMax;
+
+    let anchor = "middle";
+    if (i === 0) anchor = "start";
+    if (i === dates.length - 1) anchor = "end";
+
+    return `<text x="${x}" y="${xLabelY}"
+             text-anchor="${anchor}"
+             font-size="13"
+             fill="rgba(148,163,184,.95)">${d}</text>`;
+  }).join("");
+
+  // colors stable by horizon order
+  const rowsForColorIndex = DATA.filter(d=>d.symbol===sym && d.tag===tag);
+  const allHzSorted = uniq(rowsForColorIndex.map(d=>d.horizon_ms)).sort((a,b)=>a-b);
+
+  let paths = "";
+  let points = "";
+
+  horizons.forEach(hz => {
+    const pts = seriesMap.get(hz) || [];
+    const idx = allHzSorted.indexOf(hz);
+    const color = COLORS[(idx >= 0 ? idx : 0) % COLORS.length];
+
+    // full-date path with gaps
+    const valByDate = new Map(pts.map(p => [p.asof, p.y]));
+    let dPath = "";
+    let started = false;
+
+    for (const dt of dates) {
+      const yv = valByDate.get(dt);
+      if (!Number.isFinite(yv)) { started = false; continue; }
+      const x = X(dt), y = Y(yv);
+      dPath += (started ? ` L ${x} ${y}` : ` M ${x} ${y}`);
+      started = true;
+    }
+
+    paths += `<path data-hz="${hz}" d="${dPath}" fill="none" stroke="${color}" stroke-width="2.7" />`;
+
+    // hover points only where finite
+    pts.forEach(p => {
+      const x = X(p.asof), y = Y(p.y);
+      points += `
+        <circle class="pt" data-hz="${hz}" data-date="${p.asof}" data-val="${p.y}"
+                cx="${x}" cy="${y}" r="10"
+                fill="transparent" stroke="transparent"></circle>
+        <circle cx="${x}" cy="${y}" r="2.3" fill="${color}" opacity="0.95"></circle>
+      `;
+    });
+  });
+
+  // axes (x-axis baseline at H - m.b)
+  svg.innerHTML = `
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"></rect>
+    ${gridLines}
+
+    <line x1="${m.l}" x2="${W-m.r}" y1="${H-m.b}" y2="${H-m.b}" stroke="rgba(148,163,184,.25)" />
+    <line x1="${m.l}" x2="${m.l}" y1="${m.t}" y2="${H-m.b}" stroke="rgba(148,163,184,.25)" />
+
+    <text x="${m.l}" y="${m.t-5}" font-size="12" fill="rgba(148,163,184,.90)">${sym} ${tag} • ${metric}</text>
+
+    ${xLabels}
+    ${paths}
+    ${points}
+  `;
+
+  status(`${sym} ${tag} • metric=${metric} • horizons=${horizons.length} • dates=${dates.length} • range=${rng.start||"—"}..${rng.end||"—"}`);
+
+  // snapshot keys in exact CSV order (asof + METRICS)
+  const firstHz = horizons[0];
+  const snapRows = DATA
+    .filter(d => d.symbol===sym && d.tag===tag && d.horizon_ms===firstHz && inRange(String(d.asof), rng.start, rng.end))
+    .sort((a,b)=>String(a.asof).localeCompare(String(b.asof)));
+  const last = snapRows[snapRows.length-1] || null;
+
+  if(last){
+    const SNAPSHOT_KEYS = ["asof"].concat(METRICS);
+    $("kpi").innerHTML = SNAPSHOT_KEYS
+      .filter(k=>k in last)
+      .map(k=>`<div>${k}</div><div>${fmt(last[k])}</div>`)
+      .join("");
+  } else {
+    $("kpi").innerHTML = `<div class="muted">No snapshot rows for first selected horizon in range.</div>`;
+  }
+
+  // tooltip hover
+  function showTip(evt, hz, date, val){
+    tip.style.display = "block";
+    tip.innerHTML = `
+      <div><b>${sym} ${tag}</b></div>
+      <div class="muted">date: ${date}</div>
+      <div class="muted">horizon: ${hz} (${horizonLabel(Number(hz))})</div>
+      <div>${metric}: <b>${fmt(Number(val))}</b></div>
+    `;
+    const rect = svg.getBoundingClientRect();
+    const x = evt.clientX - rect.left + 12;
+    const y = evt.clientY - rect.top + 12;
+    tip.style.left = `${x}px`;
+    tip.style.top  = `${y}px`;
+  }
+  function hideTip(){ tip.style.display = "none"; }
+
+  svg.onmousemove = (evt) => {
+    const target = evt.target;
+    if(target && target.classList && target.classList.contains("pt")){
+      showTip(evt, target.getAttribute("data-hz"), target.getAttribute("data-date"), target.getAttribute("data-val"));
+    } else {
+      hideTip();
+    }
+  };
+  svg.onmouseleave = hideTip;
+}
+
+function cycleMetric(dir){
+  const cur = $("metric").value;
+  const i = METRICS.indexOf(cur);
+  if(i<0) return;
+  $("metric").value = METRICS[(i + dir + METRICS.length) % METRICS.length];
+  render();
+}
+
+/* ---------- load ---------- */
+async function main(){
+  const res = await fetch("data.json?v="+Date.now(), {cache:"no-store"});
+  DATA = await res.json();
+
+  DATA.forEach(d=>{
+    d.symbol = String(d.symbol).toUpperCase();
+    d.tag = String(d.tag).toUpperCase();
+    d.horizon_ms = Number(d.horizon_ms);
+    d.asof = String(d.asof);
+  });
+
+  buildSelectors();
+
+  $("sym").onchange = refreshHZMetric;
+  $("tag").onchange = refreshHZMetric;
+  $("metric").onchange = render;
+  $("prev").onclick = () => cycleMetric(-1);
+  $("next").onclick = () => cycleMetric(1);
+}
+main();
+</script>
+</body>
+</html>
